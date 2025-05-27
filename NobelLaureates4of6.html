@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nobel Peace Laureates (1975-1993): An Interactive Exploration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Visualization & Content Choices: 
+        - Laureate Data (Year, Name, Country, Bio, Contributions, AI Score, AI Analysis): Displayed in structured text blocks (HTML/Tailwind) upon selection. Goal: Inform. Interaction: Click to reveal. Justification: Clear presentation of detailed textual information.
+        - AI Replication Probability Scores: Visualized as a Bar Chart (Chart.js Canvas). Goal: Compare AI replication potential. Interaction: Tooltips on bars. Justification: Effective for comparing discrete values across laureates.
+        - Year Filter: Dropdown (HTML/JS). Goal: Organize/Filter. Interaction: Select year to update laureate list. Justification: Allows users to focus on specific periods.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            /* Adjusted for potentially more bars */
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            /* Base height */
+            max-height: 500px;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 500px;
+            }
+        }
+
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            /* slate-300 */
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+            /* slate-400 */
+        }
+
+        .laureate-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .laureate-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .active-filter {
+            background-color: #f97316;
+            /* orange-500 */
+            color: white;
+        }
+
+        .filter-button {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+    </style>
+</head>
+
+<body class="bg-stone-100 text-gray-800">
+
+    <header class="bg-orange-700 text-white p-6 shadow-md sticky top-0 z-50">
+        <div class="container mx-auto">
+            <h1 class="text-3xl font-bold">Nobel Peace Laureates (1975-1993): An Interactive Exploration</h1>
+            <p class="text-sm mt-1 text-orange-100">Explore the contributions of Nobel Peace Prize winners and an
+                analysis of AI's potential to replicate their impact.</p>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        <section id="introduction" class="mb-8 p-6 bg-white rounded-lg shadow">
+            <h2 class="text-2xl font-semibold text-orange-700 mb-3">Welcome to the Laureate Explorer</h2>
+            <p class="text-gray-700 leading-relaxed">
+                This application provides an interactive way to delve into the lives and achievements of Nobel Peace
+                Prize laureates from 1975 to 1993, based on the provided research report. You can explore each
+                laureate's biographical details, their defining contributions to peace, and a unique prognostication on
+                the potential for Artificial Intelligence (AI) to replicate their abilities and lived experiences. Use
+                the filters to navigate by year, or browse the full list. Click on any laureate to view their detailed
+                profile. A comparative chart also visualizes the AI replication probability scores.
+            </p>
+        </section>
+
+        <section id="filters" class="mb-8 p-6 bg-white rounded-lg shadow">
+            <h2 class="text-2xl font-semibold text-orange-700 mb-4">Filter Laureates</h2>
+            <div class="flex flex-wrap gap-2 items-center">
+                <label for="yearFilter" class="mr-2 font-medium text-gray-700">Filter by Year:</label>
+                <select id="yearFilter"
+                    class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500">
+                    <option value="all">All Years (1975-1993)</option>
+                </select>
+                <button id="clearFilter"
+                    class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-md filter-button">
+                    Show All
+                </button>
+            </div>
+        </section>
+
+        <main class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div id="laureateListContainer"
+                class="md:col-span-1 bg-white p-6 rounded-lg shadow max-h-[80vh] overflow-y-auto">
+                <h2 class="text-xl font-semibold text-orange-700 mb-4 sticky top-0 bg-white py-2 z-10">Laureates</h2>
+                <div id="laureateList" class="space-y-4">
+                </div>
+            </div>
+
+            <div id="laureateDetail" class="md:col-span-2 bg-white p-6 rounded-lg shadow min-h-[60vh]">
+                <div id="detailContent" class="prose max-w-none prose-orange">
+                    <h2 class="text-2xl font-semibold text-orange-700">Select a Laureate</h2>
+                    <p class="text-gray-600">Click on a laureate from the list to see their details here.</p>
+                </div>
+            </div>
+        </main>
+
+        <section id="aiChartSection" class="mt-12 p-6 bg-white rounded-lg shadow">
+            <h2 class="text-2xl font-semibold text-orange-700 mb-3">AI Replication Probability Analysis</h2>
+            <p class="text-gray-700 leading-relaxed mb-6">
+                This chart visualizes the "Lived Experience Replication Probability" scores assigned in the report. This
+                speculative score (0-100%) estimates the likelihood that an AI could replicate the laureate's lived
+                experiences or the unique wisdom, conviction, and moral authority derived from those experiences. A
+                lower score suggests a greater reliance on uniquely human qualities.
+            </p>
+            <div class="chart-container">
+                <canvas id="aiReplicationChart"></canvas>
+            </div>
+        </section>
+
+        <footer class="text-center mt-12 py-6 border-t border-gray-300">
+            <p class="text-sm text-gray-600">&copy; 2025 Interactive Nobel Laureate Explorer. Content based on provided
+                research report.</p>
+        </footer>
+    </div>
+
+    <script>
+        const laureatesData = [
+            {
+                year: 1975,
+                name: "Andrei Sakharov",
+                country: "Soviet Union",
+                nobelRecognition: "Andrei Dmitrievich Sakharov (1921–1989) was a Soviet nuclear theoretical physicist crucial in developing the Soviet Union's hydrogen bomb. Despite his privileged position, he became an outspoken advocate for human rights, civil liberties, disarmament, and political reform. The Nobel Committee awarded him the 1975 Nobel Peace Prize 'for his struggle for human rights in the Soviet Union, for disarmament and cooperation between all nations'. His wife, Elena Bonner, received the prize on his behalf as he was denied travel.",
+                contributions: "Sakharov's advocacy began in the late 1950s, concerned about nuclear test fallout. His 1968 essay, 'Reflections on Progress, Peaceful Coexistence, and Intellectual Freedom,' called for arms reductions and criticized Soviet repression, leading to his ban from military work. In 1970, he co-founded the 'Committee for Human Rights' in Moscow. He emphasized that 'Man’s inviolable rights provide the only safe foundation for genuine and enduring international cooperation.' His Nobel lecture highlighted that 'Peace, progress, human rights – these three goals are insolubly linked'. He faced increasing regime pressure, including internal exile in Gorky (1980-1986).",
+                thematicInsight: "Sakharov's journey from celebrated state scientist to persecuted dissident underscores a profound internal transformation driven by scrupulous honesty, scientific understanding of nuclear dangers, and growing awareness of human rights abuses. His deep scientific understanding of nuclear weapons' destructive power was a direct catalyst for his ethical awakening and peace advocacy, undertaken at immense personal risk. This illustrates how profound expertise, coupled with strong moral character, can lead to transformative activism transcending personal comfort and safety, a timeless tension between state control and individual moral responsibility.",
+                aiQualitative: "An AI trained on Sakharov's writings could analyze geopolitical data, draft policy papers, and model nuclear proliferation risks. However, it couldn't replicate the moral courage of transitioning from a privileged position to a persecuted dissident, a journey driven by personal conviction and entailing immense personal risk. This transformation involved an internal ethical compass, a deep sense of personal responsibility, and a willingness to forfeit security for principles. The lived experience of intellectual and moral awakening, courageous public dissent, and resilience under state oppression is beyond AI's purview.",
+                aiQuantitativeScore: 5,
+                aiJustification: "Sakharov's 'lived experience' includes his rise to scientific eminence, the moral processes leading to his dissent, speaking truth to power in a repressive regime, and subsequent persecution. These experiences forged his unique authority. An AI could learn about these events but cannot replicate the internal journey of moral transformation, the courage born from scientific insight and ethical awakening, or the steadfast resilience under duress. The 5% acknowledges a marginal theoretical possibility of simulating external advocacy patterns but not the essence of his human journey or internally generated moral force."
+            },
+            {
+                year: 1976,
+                name: "Betty Williams & Mairead Corrigan",
+                country: "United Kingdom",
+                nobelRecognition: "Betty Williams (1943–2020) and Mairead Corrigan (born 1944) co-founded the 'Women for Peace' movement (later 'Peace People') in Northern Ireland, responding to 'The Troubles'. They received the 1976 Nobel Peace Prize 'for the courageous efforts in founding a movement to put an end to the violent conflict in Northern Ireland' (awarded in 1977). The catalyst was a tragic incident on August 10, 1976, where an IRA getaway car killed Mairead Corrigan's sister's three young children after the driver was shot by British troops. Betty Williams witnessed this.",
+                contributions: "Immediately after the tragedy, Betty Williams collected signatures for a peace petition and made a TV appeal. Mairead Corrigan joined her, and together they galvanized the public. Their movement, the Peace People (co-founded with journalist Ciaran McKeown), organized large peace marches with thousands of Catholic and Protestant women. They focused on grassroots reconciliation, advocating for integrated schools and residential areas, and providing support like bus services for prisoners' families. Their core message was an appeal to common humanity, urging an end to violence and fostering cross-community dialogue. In its first six months, the movement was credited with a 70% reduction in violence.",
+                thematicInsight: "The Peace People movement illustrates how profound personal trauma, channeled constructively, can catalyze grassroots peace mobilization. The raw, authentic grief and moral outrage of Williams and Corrigan resonated deeply in a violence-weary community, transcending sectarian divisions by appealing to shared humanity. This emotional authenticity, sparked by visceral tragedy, temporarily overrode entrenched loyalties, showing that in identity-driven conflicts, emotional resonance and appeals to shared values can be critical in disrupting violence cycles where rational approaches fail.",
+                aiQualitative: "An AI could analyze Northern Ireland's conflict dynamics, identify peace stakeholders, draft peace appeals, or manage communication for a peace movement. However, Williams' and Corrigan's impact stemmed from their immediate, visceral, human response to tragedy. This spontaneous, emotionally charged leadership, born from shared anguish, is exceptionally difficult for AI to replicate. Their ability to articulate mass sentiment came from empathy, grief, and moral clarity, not data analysis. The courage to venture into polarized, dangerous environments with a reconciliation message required human bravery AI cannot possess.",
+                aiQuantitativeScore: 2,
+                aiJustification: "The catalyst was an intensely personal tragedy—witnessing and experiencing children's violent deaths. The raw grief, moral outrage, and courage to transform suffering into a mass peace movement are deeply intertwined with human emotion, empathy, familial bonds, and 'The Troubles'' unique socio-cultural context. An AI cannot 'experience' such loss or replicate the community dynamics and shared historical trauma that gave their actions resonance. The 2% acknowledges a remote theoretical possibility of AI identifying successful grassroots mobilization patterns but not capturing the experiential, emotional, or moral core of their journey."
+            },
+            {
+                year: 1977,
+                name: "Amnesty International",
+                country: "United Kingdom",
+                nobelRecognition: "Amnesty International (AI) was founded in London on May 28, 1961, by lawyer Peter Benenson, moved by the imprisonment of two Portuguese students for toasting to freedom. It grew into a global movement. AI received the 1977 Nobel Peace Prize 'for worldwide respect for human rights'. The Nobel Committee recognized its role in mobilizing international public opinion against human rights violations and its impartial defense of human dignity against torture and degradation, viewing these as contributions to peace.",
+                contributions: "AI's mission is research and action to prevent grave human rights abuses. Core values: international solidarity, effective action for victims, global coverage, universality of human rights, impartiality, independence, and democracy. Primary methods: meticulous, impartial research documenting violations by governments and non-state actors, forming the basis of reports. Early work featured 'adoption groups' where volunteers campaigned for prisoners of conscience via letter-writing. AI campaigns for prisoner release, fair trials, and abolition of torture and the death penalty. It operates independently of political ideology, economic interest, or religion, crucial for its credibility. AI's work contributed to releasing thousands of prisoners and developing international human rights law like the UN Convention Against Torture. It's a democratic, people-powered movement with millions of members.",
+                thematicInsight: "Amnesty International's success shows that a globally coordinated, impartial, research-driven human rights advocacy, powered by citizen engagement, can exert moral and political pressure on states, leading to tangible improvements. Founded on a specific injustice, it evolved a systematic methodology: rigorous research for credibility, then mass mobilization. Its impartiality, evidenced by criticism from diverse regimes, testified to its effectiveness. This model suggests organized 'people power,' grounded in facts and universal ethics, can be a formidable force for global good, a framework potentially amplified or challenged by AI in information dissemination.",
+                aiQualitative: "AI could significantly enhance Amnesty's operational functions: processing data to identify abuse patterns faster, assisting in drafting reports, translating, managing campaigns, and optimizing advocacy. However, the foundational impetus—Benenson's moral outrage—and the sustained commitment of millions of human volunteers are driven by human empathy and moral conviction. Replicating this 'people-powered movement' and its 'moral authority' is challenging. 'Bearing witness' via dangerous fieldwork has an irreplaceable human element of courage. Ensuring AI's genuine independence from data bias or creator intentions would require rigorous safeguards.",
+                aiQuantitativeScore: 20,
+                aiJustification: "This reflects AI's potential to replicate many functional aspects (research, data analysis, campaign management). However, Amnesty's 'lived experience' is the sum of countless individual acts of conscience, volunteerism, and advocacy by its global staff and members, often in perilous circumstances. The collective human commitment to justice and dignity is its core driving force. While AI can process information about these values, it cannot intrinsically share or be motivated by them. The 20% acknowledges substantial functional replication potential but limitations in replicating the underlying humanistic drive, ethical judgment, and courage in human rights work."
+            },
+            {
+                year: 1978,
+                name: "Muhammad Anwar el-Sadat & Menachem Begin",
+                country: "Egypt & Israel",
+                nobelRecognition: "Muhammad Anwar el-Sadat (1918–1981), President of Egypt, was a key figure in Egypt's nationalist movement and initiated bold peace negotiations with Israel. Menachem Begin (1913–1992), Prime Minister of Israel, was a lifelong Zionist leader. They were jointly awarded the 1978 Nobel Peace Prize 'for jointly having negotiated peace between Egypt and Israel in 1978,' specifically for their contributions to the Camp David Accords.",
+                contributions: "Sadat's defining act was his historic visit to Jerusalem in November 1977, addressing the Israeli Knesset, breaking a psychological barrier. Begin, despite a hardline reputation, engaged in difficult negotiations, prodded by U.S. President Carter. The Camp David Accords (September 1978) consisted of two frameworks: one for broader Middle East peace (including Palestinian issues) and one for an Egypt-Israel peace treaty. This led to the 1979 treaty where Israel withdrew from Sinai for full diplomatic recognition and peace with Egypt.",
+                thematicInsight: "The joint Nobel Prize highlights that transformative peace often requires leaders with 'hardline' nationalist credentials to take bold risks. Their credibility allows them to make concessions that moderate leaders might find domestically impossible. Sadat, an Egyptian nationalist who led the 1973 war, had the standing for his Jerusalem visit. Begin, a lifelong Zionist with a militant past, could agree to return Sinai because his security credentials were unquestioned. Their pasts paradoxically provided the political capital for peace. This suggests AI modeling peace negotiations must account for leader psychology, domestic politics, symbolic gestures, and third-party mediation—human dynamics AI struggles to replicate.",
+                aiQualitative: "Sadat: AI could analyze grievances, assess benefits of peace, and propose initiatives. However, Sadat's Jerusalem visit was a personal, high-stakes gamble requiring bravery, visionary capacity, and charismatic leadership—profoundly human qualities. Begin: AI could model negotiation strategies based on his ideology and history. However, Begin's shift from a hardline stance involved intricate political calculations, pragmatic re-evaluation, and persuading a skeptical constituency, requiring political acumen and personal evolution. The human chemistry and psychological dynamics of Camp David, managed by Carter, are beyond AI.",
+                aiQuantitativeScore: 3, // Average for simplicity, or could be listed per person
+                aiJustification: "Sadat (3%): His journey from nationalist leader to peacemaker, involving war leadership and a dramatic pivot costing his life, is rooted in human agency and unique historical context. Begin (3%): His life, shaped by Holocaust trauma, militant leadership, and decades in opposition, leading to a peace decision influenced by unique conjunctures and personal interactions, is beyond AI's replication."
+            },
+            {
+                year: 1979,
+                name: "Mother Teresa",
+                country: "India (born in Ottoman Empire)",
+                nobelRecognition: "Mother Teresa (Agnes Gonxha Bojaxhiu, 1910-1997) was born in Uskup, Ottoman Empire. After a religious calling, she joined the Sisters of Loreto in India. In 1946, she felt a 'call within a call' to serve 'the poorest of the poor' in Calcutta's slums. She founded the Missionaries of Charity in 1950. She received the 1979 Nobel Peace Prize 'for her work for bringing help to suffering humanity'.",
+                contributions: "The Missionaries of Charity aimed to care for society's abandoned: 'the hungry, the naked, the homeless, the crippled, the blind, the lepers...'. Mother Teresa established facilities like Nirmal Hriday (hospice for the terminally ill), homes for orphans, lepers, and the disabled. The order expanded globally with thousands of sisters and co-workers. Her work involved direct, personal, selfless service to those in extreme suffering, characterized by 'compassion'. She advocated for the dignity of every human and promoted peace through service. She held conservative Catholic views on issues like divorce and abortion.",
+                thematicInsight: "Mother Teresa's Nobel Prize recognizes direct, compassionate humanitarian service to the destitute as a vital form of peacework. By alleviating profound suffering, she addressed conditions that can cause despair and conflict. While not in political negotiations, her commitment to care and affirming dignity made a global statement on human value, a cornerstone of peace philosophies. The award links hands-on humanitarianism with broader peace goals, challenging narrow definitions of 'peace work' and highlighting the gap between programmed AI 'care' and genuine human compassion rooted in spiritual conviction or empathy.",
+                aiQualitative: "AI could manage logistics for a charity like Missionaries of Charity, optimize resource distribution, and provide informational support. However, Mother Teresa's work was defined by direct human touch, profound empathy, and selfless physical service in marginalized and agonizing circumstances. This hands-on compassion in challenging conditions is inherently human. Her advocacy was through lived example, not policy papers. Her 'call within a call' was a profound personal spiritual experience, outside AI's capacities. Inspiring thousands for such demanding work stemmed from her charisma and perceived spiritual authenticity.",
+                aiQuantitativeScore: 1,
+                aiJustification: "Mother Teresa's life was one of extreme self-abnegation, driven by deep religious faith and a divine calling to serve the 'poorest of the poor' directly and physically. This involved confronting visceral human suffering daily for decades. Replicating her spiritual convictions, compassionate action in overwhelming misery, personal sacrifices (poverty), and profound spiritual underpinnings is almost inconceivable for AI. The 1% acknowledges a remote theoretical possibility of AI directing charitable actions based on her principles, but not replicating her lived service, internal spiritual life, or the human-to-human connection essential to her work."
+            },
+            {
+                year: 1980,
+                name: "Adolfo Pérez Esquivel",
+                country: "Argentina",
+                nobelRecognition: "Adolfo Pérez Esquivel (born 1931) is an Argentine sculptor, architect, and human rights activist. He resigned his professorship in 1974 to lead Paz y Justicia (SERPAJ), an ecumenical organization for human rights and nonviolent reform in Latin America. He received the 1980 Nobel Peace Prize 'for being a source of inspiration to repressed people, especially in Latin America'. The Committee recognized him as a courageous human rights activist and opponent of violence, particularly during Argentina's military dictatorship (1976-1983). His commitment led to his arrest in 1977; he was imprisoned without charge for 14 months and tortured.",
+                contributions: "Pérez Esquivel championed nonviolent social change and human rights in Latin America. Through SERPAJ, he empowered marginalized communities, supporting rural workers' land rights and trade unions. He denounced terrorism from all sides and spoke for the 'desaparecidos' of Argentina's 'Dirty War'. His activism was rooted in Christian faith and liberation theology, emphasizing a preferential option for the poor. He believed 'Truth is not mere abstraction, but something to be done'. Methods included building nonviolent networks, campaigning for a UN human rights commission, and being the 'voice of those who have no voice'. His nonviolence was influenced by Gandhi and the Sermon on the Mount.",
+                thematicInsight: "Pérez Esquivel's work illustrates the powerful synergy between faith-based convictions (liberation theology) and nonviolent human rights activism. This provided a moral framework and resilience against extreme state repression. His connection of activism to faith and 'the sacred, transcendent and irrevocable dignity that belongs to the human being' supplied the moral imperative. This spiritual foundation sustained him through imprisonment and torture. SERPAJ's mission mirrored liberation theology's commitment to the oppressed. His spiritual convictions were a core driving force, highlighting that for many activists in oppressive environments, deeply held beliefs are essential wellsprings of strength and resistance—an internal conviction AI cannot replicate.",
+                aiQualitative: "An AI could analyze repression patterns, disseminate violation information, and coordinate activist networks, mirroring some SERPAJ functions. It could draft reports and educational materials on nonviolent resistance. However, Pérez Esquivel's impact is linked to his personal faith, artistic sensibility, and willingness to endure imprisonment and torture for his beliefs. This moral courage, spiritual conviction, and personal sacrifice are not AI-replicable. His ability to inspire repressed people stemmed from lived solidarity and personal suffering. His nonviolence, a 'spirit and a method' rooted in his gospel interpretation, was forged in extreme adversity.",
+                aiQuantitativeScore: 2,
+                aiJustification: "Pérez Esquivel's transformation from artist/academic to a leading human rights defender confronting a brutal dictatorship, facing severe persecution including torture, is a journey of profound personal conviction, courage, and suffering. His faith and commitment to nonviolence were tested and strengthened. An AI cannot replicate the subjective experience of torture, spiritual strength from faith during such an ordeal, or the specific socio-cultural/political context shaping his activism. The 2% acknowledges a slim theoretical possibility of AI identifying effective nonviolent strategies from data, but not embodying the experiential, spiritual, or moral core of his life and impact."
+            },
+            {
+                year: 1981,
+                name: "Office of the United Nations High Commissioner for Refugees (UNHCR)",
+                country: "United Nations",
+                nobelRecognition: "UNHCR was established by the UN General Assembly on December 14, 1950, post-WWII, initially to help displaced Europeans with a three-year mandate. As new refugee crises emerged, its mandate was extended, becoming permanent in 2003. UNHCR received the 1981 Nobel Peace Prize 'for promoting the fundamental rights of refugees' (its second, first in 1954). The 1981 award came during significant global refugee movements, like the 'Boat People' from Southeast Asia.",
+                contributions: "UNHCR leads international action to protect refugees, forcibly displaced communities, and stateless people. Its core mission: life-saving assistance (shelter, food, water, medical care) and safeguarding fundamental human rights. It's the guardian of the 1951 Refugee Convention and its 1967 Protocol, key legal documents defining refugee rights and state obligations, including non-refoulement (not returning refugees to danger). UNHCR operates in 136 countries, assisting ~122.6 million displaced people. Activities: emergency response, long-term care, human rights protection, ending statelessness, and durable solutions (repatriation, local integration, resettlement). Challenges: increasing displaced persons, complex conflicts, varying state willingness to uphold refugee rights.",
+                thematicInsight: "UNHCR's repeated Nobel recognition (1954, 1981) underscores the escalating global refugee crisis as an enduring challenge to peace and stability, affirming the vital role of an international institution in upholding displaced persons' rights and coordinating humanitarian response. Its evolution from a temporary European focus to a permanent global agency mirrors modern forced displacement trends. The 1981 prize, amidst crises like the 'Boat People', recognized its ongoing efforts to promote refugee rights. The scale of its operations demonstrates the problem's magnitude. Challenges (rising numbers, complex causes, inconsistent state adherence) suggest that while legal frameworks are crucial, effective implementation relies on political will, resources, and UNHCR's adaptability. AI could enhance UNHCR's capabilities, but fundamental solutions remain rooted in political action and human commitment.",
+                aiQualitative: "AI could revolutionize UNHCR's operational/analytical capabilities: processing data to predict refugee flows, optimizing aid logistics, managing refugee databases, translating languages, assisting in asylum claim processing, drafting advocacy materials, and monitoring refugee law compliance. However, UNHCR's core mandate involves direct human interaction in sensitive, traumatic, culturally diverse situations. Tasks like refugee status interviews, psychosocial support, negotiating humanitarian access in conflict zones, and making critical protection decisions require nuanced human judgment, empathy, cultural sensitivity, interpersonal skills, and trust-building in volatile environments—qualities AI lacks. The 'protection' aspect relies on human field officers' courage, adaptability, and ethical decision-making in unpredictable, dangerous circumstances.",
+                aiQuantitativeScore: 25,
+                aiJustification: "UNHCR's 'lived experience' is the cumulative institutional knowledge and collective experiences of its tens of thousands of staff working globally, often in hardship and danger, for over seven decades. AI can learn from its vast operational data, identify patterns, improve efficiencies, and support decision-making. However, it cannot replicate the physical courage in war zones, emotional toll of witnessing suffering, complexities of intercultural communication, or human judgment in life-threatening situations. The 25% reflects strong potential for AI to augment operational capacities and learn from historical data, but not replicate the core human experience of its diverse workforce in direct protection and assistance."
+            },
+            {
+                year: 1982,
+                name: "Alva Myrdal & Alfonso García Robles",
+                country: "Sweden & Mexico",
+                nobelRecognition: "Alva Myrdal (1902–1986) was a Swedish Social Democratic politician, diplomat, and cabinet minister. Her career included heading UN welfare policy, chairing UNESCO's social science section, and serving as Sweden's ambassador to India. From 1962, she was Sweden's representative to the Geneva disarmament conference, leading non-aligned nations. Alfonso García Robles (1911–1991) was a Mexican diplomat, Foreign Minister, and Permanent Representative to the UN Committee on Disarmament. He was pivotal in the Treaty of Tlatelolco (1967), establishing Latin America as a nuclear-weapon-free zone. They were jointly awarded the 1982 Nobel Peace Prize 'for their work for disarmament and nuclear and weapon-free zones'.",
+                contributions: "Alva Myrdal combined intellectual commitment with professional insight in disarmament. She advocated for concrete measures, criticized superpower reluctance, and believed neutral nations had a role in superpower disarmament and nuclear-free zones. She helped establish SIPRI. Alfonso García Robles, 'father of the Tlatelolco Agreement,' used diplomatic skill for this landmark treaty. He was central to UN general disarmament efforts, drafting the 'Final Document' of the 1978 UN special session on disarmament. Both had deep expertise in disarmament's technical/political aspects and used international forums to advance their goals.",
+                thematicInsight: "The joint award to Myrdal and García Robles highlights the complementary roles of expert-driven diplomatic efforts from state structures (García Robles) and independent/critically aligned positions (Myrdal). Progress on disarmament and nuclear-weapon-free zones isn't solely dependent on major powers but can be advanced by others using international law, multilateral forums, and specialized knowledge. Myrdal galvanized non-aligned nations; García Robles architected a regional denuclearization treaty. Both deployed technical understanding and political acumen. Their achievements underscore that diverse approaches and actors are essential for disarmament. The Treaty of Tlatelolco shows viability of regional paths. While AI could aid technical analysis, human diplomatic leadership, trust-building, and negotiation remain paramount.",
+                aiQualitative: "An AI could master arms control treaty details, analyze proliferation data, model disarmament scenarios, and draft treaty language. It could provide negotiators with rapid information access. However, Myrdal and García Robles's work involved decades of sustained, high-level diplomatic engagement, cultivating trust, persuading reluctant states, and navigating complex geopolitics. Myrdal's leadership of non-aligned nations and García Robles's 'diplomatic skill' for the Tlatelolco Treaty relied on human qualities: persuasive oratory, tenacity, strategic thinking, political acumen, and inspiring confidence. Myrdal's 'profound commitment' and García Robles's Nobel lecture reflect deep personal conviction.",
+                aiQuantitativeScore: 10, // Average for simplicity
+                aiJustification: "Myrdal (10%): Her career spanned social welfare, women's rights, and high-level diplomacy before focusing on disarmament. AI could process her writings and diplomatic records, but replicating her persuasive power, moral authority from public service, and ability to lead nations in complex negotiations is a substantial leap. García Robles (10%): His 'lived experience' was as a career diplomat in UN disarmament negotiations. The Treaty of Tlatelolco resulted from sustained effort, expertise, and negotiating skill. AI could learn treaty mechanics, but human elements of consensus-building, trust, navigating nuances, and persuasive argumentation in high-stakes diplomacy are exceptionally hard to replicate."
+            },
+            {
+                year: 1983,
+                name: "Lech Wałęsa",
+                country: "Poland",
+                nobelRecognition: "Lech Wałęsa (born 1943) was a Polish labour activist and electrician at Gdańsk's Lenin Shipyard. He co-founded and led Solidarity (Solidarność), the Eastern Bloc's first independent trade union (1980-1990). He was President of Poland (1990-1995). He received the 1983 Nobel Peace Prize 'for non-violent struggle for free trade unions and human rights in Poland', shortly after release from internment following martial law (imposed Dec 1981), which banned Solidarity and led to arrests.",
+                contributions: "Wałęsa rose as a charismatic strike leader in Gdańsk (August 1980), elected head of the strike committee, then led the Interfactory Strike Committee, which became Solidarity. The movement grew to ~10 million workers and farmers, a force for change. His leadership involved brave negotiations with communist authorities, commitment to nonviolent resistance, and political skills. Despite martial law, internment, and Solidarity's delegalization, he continued to inspire the underground movement, becoming a resistance symbol. In 1989, he led opposition in Round Table Talks, leading to Solidarity's re-legalization and semi-free elections. Solidarity's success led to the first non-communist-led government in the Soviet bloc, pivotal in communism's decline in Eastern Europe. He combined courage with astute tactics, learning from past failed resistance.",
+                thematicInsight: "Wałęsa's leadership of Solidarity shows charismatic grassroots individuals, with nonviolent mass mobilization strategy and broad societal alliances (intellectuals, Catholic Church, rural populations), can challenge and dismantle authoritarian regimes, even within a superpower's sphere. An electrician, his leadership emerged organically. Solidarity's growth to 10 million members united diverse Polish society. Despite repression, the movement persisted nonviolently. The 1989 Round Table Talks and peaceful power transition were direct outcomes. This underscores the power of a unified, nonviolent mass movement led by someone embodying its aspirations and maintaining resilience. Solidarity and Wałęsa's Nobel were catalysts for weakening Soviet control. Internal pressures for rights and self-determination can be powerful change agents. While AI could analyze socio-economic factors or model resistance patterns, human agency, charismatic leadership, and moral courage are beyond its capacities.",
+                aiQualitative: "An AI could analyze labor conditions, grievances, and protest patterns to draft union demands or movement strategies. It could manage communication networks and study historical resistance for tactics. However, Wałęsa's leadership was profoundly charismatic and personal. His symbolic act of climbing the shipyard fence was a spontaneous, courageous display of solidarity AI cannot replicate. His ability to unite disparate groups and sustain morale during intense repression relied on human trust, shared identity, and inspiring hope. His 'plain speech' and 'confrontational style' were key to his authenticity. High-stakes negotiations with a communist regime, under threat of Soviet intervention, required immense political courage, judgment, and intuitive power understanding—quintessentially human.",
+                aiQuantitativeScore: 2,
+                aiJustification: "Wałęsa's journey from shipyard electrician to leader of a transformative social movement challenging a totalitarian regime, involving imprisonment, harassment, and immense personal responsibility, is a narrative of extraordinary courage, innate leadership, political intuition, and resilience forged in an oppressive context. The 'lived experience' of leading strikes, organizing underground resistance, navigating treacherous political negotiations, and embodying millions' hopes is a deeply human and historically unique phenomenon. The 2% acknowledges AI's potential to analyze movement mechanics or political negotiations data-drivenly, but not replicate charismatic leadership, moral conviction, or the personal experience of such a struggle."
+            },
+            {
+                year: 1984,
+                name: "Desmond Tutu",
+                country: "South Africa",
+                nobelRecognition: "Desmond Mpilo Tutu (1931–2021) was an influential South African Anglican cleric and theologian. He became the first Black Anglican Dean of Johannesburg (1975), General Secretary of the South African Council of Churches (SACC) (1978), and first Black Archbishop of Cape Town (1986). He received the 1984 Nobel Peace Prize 'for his role as a unifying leader figure in the non-violent campaign to resolve the problem of apartheid in South Africa'. The Committee recognized him as a leader championing truth, freedom, justice, and offering a peaceful alternative to violent rebellion.",
+                contributions: "Archbishop Tutu was a leading voice for Black South Africans' rights and a globally recognized apartheid opponent. He emphasized nonviolent protest and advocated for international economic pressure/sanctions. As SACC General Secretary, he formulated goals for a future South Africa: 'a democratic and just society without racial segregation,' demanding equal civil rights, abolition of Pass Laws, a common non-racial education system, and cessation of forced deportations. He propagated the 'Rainbow Nation' vision. Post-apartheid, President Mandela appointed him Chair of the Truth and Reconciliation Commission (TRC) to investigate apartheid-era abuses and foster national healing. His advocacy had moral authority, clarity, compassion, wit, and humor. His oratory included appeals for peace and non-hatred. Central to his message and TRC work was the transformative power of forgiveness and reconciliation.",
+                thematicInsight: "Desmond Tutu's leadership shows how deep spiritual conviction (Christian faith), exceptional charismatic communication, and unwavering commitment to nonviolence/reconciliation can provide potent moral leadership against systemic injustice and guide a nation through traumatic transition. His anti-apartheid stance was grounded in theology (racial segregation 'against God's will'). His church leadership gave him a platform and moral authority. His nonviolent advocacy was courageous. The 'Rainbow Nation' concept and TRC stewardship emphasized forgiveness over retribution, vital for healing. This combination was central to his effectiveness. In divided societies, such moral/spiritual leadership can be as crucial as political negotiation for healing and sustainable peace. The TRC model, emphasizing truth for reconciliation, offers an alternative to punitive justice. While AI could process TRC data, human capacity to chair such a body, guide emotional/moral processes, and embody hope/forgiveness is irreplaceable.",
+                aiQualitative: "An AI trained on Tutu's works could generate texts advocating human rights, nonviolence, justice, and reconciliation, mimicking his theological arguments. It could analyze apartheid structures and propose democratic policy alternatives. However, Tutu's influence lay in his profound moral authority, charismatic/joyful public presence, and deep Christian faith informing his anti-apartheid stance. His ability to inspire hope, foster unity in a divided society, and articulate a 'Rainbow Nation' vision was linked to personal conviction and spiritual depth. His TRC leadership required immense human wisdom, empathy, listening capacity, and navigating national trauma while guiding healing/forgiveness—deeply human capacities rooted in emotional intelligence, moral reasoning, and spiritual insight, far beyond AI. His message 'without forgiveness there can be no future' reflects spiritual/ethical depth algorithms cannot embody.",
+                aiQuantitativeScore: 1,
+                aiJustification: "Archbishop Tutu's 'lived experience' includes growing up under apartheid, his journey into priesthood (partly a response to Bantu education injustices), courageous SACC leadership during repression, and his pivotal TRC chairmanship. His moral stature was built on decades of faith-driven advocacy against a brutal regime. The ability to embody hope, practice/preach forgiveness with profound conviction, and lead a nation towards reconciliation with grace/impact is uniquely human. An AI cannot replicate the spiritual journey, lived experience of racial oppression and its fight, or charismatic ability to connect with and lead a diverse nation towards healing."
+            },
+            {
+                year: 1985,
+                name: "International Physicians for the Prevention of Nuclear War (IPPNW)",
+                country: "United States",
+                nobelRecognition: "IPPNW is a non-partisan global federation of national medical groups, co-founded in 1980 by American (Dr. Bernard Lown) and Soviet (Dr. Yevgeny Chazov) physicians, a significant collaboration across the Cold War divide. IPPNW received the 1985 Nobel Peace Prize 'for spreading authoritative information and by creating awareness of the catastrophic consequences of nuclear war'. The Committee acknowledged it 'performed a considerable service to mankind... thereby making medical reality a part of political reality'.",
+                contributions: "IPPNW's mission is nuclear weapons abolition and war/violence prevention, grounded in the medical principle: prevent what cannot be treated. Founders/members researched and publicized devastating medical/environmental effects of nuclear weapons (blast, heat, radiation), concluding a meaningful medical response to nuclear war is impossible. IPPNW mobilized tens of thousands of doctors, medical students, and health professionals globally. They conducted scientific research (e.g., Hiroshima/Nagasaki data) for advocacy. Efforts were crucial in raising global public awareness of nuclear war's human cost (the 'final epidemic'). During Cold War, IPPNW advocated for a nuclear test ban and educated US/USSR leaders on the nuclear arms race's existential threat. More recently, IPPNW focuses on the Treaty on the Prohibition of Nuclear Weapons (TPNW), Humanitarian Impacts of Nuclear Weapons (HINW), and nuclear war/climate crisis intersections.",
+                thematicInsight: "IPPNW's success illustrates a professional group (physicians) can be an effective non-state actor in global security by leveraging unique expertise, ethical standing, and international networks. Key strategy: reframe nuclear war in terms of direct, catastrophic human/medical consequences. Founded by physicians from opposing Cold War blocs, its core argument was medical: nuclear war is a 'final epidemic' with no cure, only prevention. Using scientific data for 'authoritative information' shifted discourse from military-strategic to urgent humanitarian concerns, increasing public awareness and influencing policymakers. US-Soviet doctor collaboration lent unique credibility. This professional advocacy model remains relevant. While AI could enhance research/dissemination, the trusted human face of expertise and medical ethical authority are crucial for persuasion and political impact.",
+                aiQualitative: "AI could be a powerful tool for IPPNW's mission: analyzing medical/scientific data on nuclear effects, modeling humanitarian consequences, drafting scientific reports/policy briefs, and optimizing global information dissemination. It could identify key policymakers for advocacy and manage logistics. However, IPPNW's founding by US/Soviet physicians during Cold War was remarkable 'citizen diplomacy' and courageous trust-building. The credibility and moral weight of physicians speaking with a unified voice on human survival, transcending national enmities, was immense. Replicating this human trust-building, perceived impartiality, and profound ethical commitment of the medical profession's call to 'prevent what they cannot cure' is challenging for AI. 'Nonpartisan cooperation among health professionals' is a human-enacted value, not programmable.",
+                aiQuantitativeScore: 30,
+                aiJustification: "A substantial part of IPPNW's impact derives from rigorous scientific research, data-driven analysis, and evidence-based advocacy—areas AI could significantly augment. Its 'lived experience' involves scientific inquiry, international medical collaboration, and public education. However, the initial creative/courageous impetus—rival superpower physicians uniting from shared ethical concern—and persuasive power of human experts advocating from medical ethics are hard for AI to fully replicate. The 30% reflects high potential for AI to enhance research, analytical, and information dissemination, but less in replicating human-driven ethical motivation, pioneering cross-cultural trust-building, or the medical voice's unique moral authority."
+            },
+            {
+                year: 1986,
+                name: "Elie Wiesel",
+                country: "United States (born in Romania)",
+                nobelRecognition: "Elie Wiesel (1928–2016) was a Romanian-born Jewish writer, professor, political activist, and Holocaust survivor. In 1944 (age 15), he and his family were deported from Sighet, Transylvania to Auschwitz. His mother and younger sister perished there; his father died at Buchenwald. Wiesel survived Auschwitz, Buna/Monowitz, and Buchenwald, liberated in April 1945. He authored nearly thirty books (later over forty), most famously 'La Nuit' ('Night'), a harrowing memoir of his camp experiences. He received the 1986 Nobel Peace Prize 'for being a messenger to mankind: his message is one of peace, atonement and dignity'. The Committee called him 'one of the most important spiritual leaders and guides' whose message was 'based on his own personal experience of total humiliation and of the utter contempt for humanity shown in Hitler's death camps'.",
+                contributions: "Wiesel dedicated his life to bearing witness to the Holocaust, ensuring its horrors are remembered and learned from, advocating against indifference and forgetting. He was a driving force behind the United States Holocaust Memorial Museum (Chairman of U.S. Holocaust Memorial Council, 1980-1986). His writings and lectures explore inhumanity, loss of faith, silence of God/world during atrocity, moral imperative of memory, and human responsibility. 'Night' is a stark testament to the suffering of six million Jewish victims and a personal account of a teenager's descent into 'hell'. His commitment, originating in Jewish suffering, broadened to all repressed peoples (Soviet Jewry, Ethiopian Jewry, South African apartheid victims, Cambodian genocide survivors). His core ability: transforming unspeakable trauma into powerful literary testimony and moral advocacy, compelling the world to confront dark history and fight indifference, hatred, violence.",
+                thematicInsight: "Elie Wiesel's work and Nobel affirm the critical, irreplaceable role of personal testimony from survivors of extreme atrocities (Holocaust) in shaping collective memory, fostering moral reflection, and driving human rights advocacy/genocide prevention. Central message: memory is a moral obligation; forgetting victims is killing them again and betraying the future. 'Night' is a direct, unflinching memoir. The Nobel Committee cited his 'personal experience' as the basis of his message. His lifelong dedication was 'remembering about and learning from the Holocaust', transforming suffering into a universal warning. Bearing witness, transmuting pain into a global call for conscience, was his core peace contribution. In an information-saturated, disinformation-prone age, authentic lived experience of suffering carries unique moral weight, irreplaceable for education and motivation. Preserving such testimonies is vital. AI can archive/analyze/disseminate, but not generate original experiential testimony. Themes Wiesel grappled with (silence of God/victims/world) are existential questions AI can analyze textually but not engage with from conscious, felt experience.",
+                aiQualitative: "An AI trained on Wiesel's corpus and Holocaust data could generate texts mimicking his style and exploring his themes, potentially analyzing genocidal patterns for warnings. However, Wiesel's moral authority, searing emotional impact, and spiritual depth stem directly from his lived experience as a Holocaust survivor. 'Night' is powerful because it's authentic personal testimony of unimaginable suffering and struggle for meaning. His role as 'messenger to mankind' is bound to his witness identity. An AI cannot 'experience' death camps, dehumanization, family loss, or the lifelong burden of memory, guilt, and moral obligation. His 'crisis of faith' and wrestling with God's silence are deeply human spiritual/existential struggles beyond algorithmic processing.",
+                aiQuantitativeScore: 0,
+                aiJustification: "Wiesel's entire moral, literary, and advocacy project is founded upon his direct, excruciating, transformative Holocaust experience. This isn't data AI can 'learn' experientially. Transmuting such trauma into a global voice for memory, peace, dignity, and fighting indifference is a uniquely human act of resilience, moral creation, and spiritual endurance. An AI cannot replicate consciousness of suffering, scars of survival, weight of bearing witness for the silenced, or moral imperative to speak truth to power that defined Wiesel. The essence of his contribution is rooted in a human experience unreproducible by non-conscious entities."
+            },
+            {
+                year: 1987,
+                name: "Óscar Arias Sánchez",
+                country: "Costa Rica",
+                nobelRecognition: "Óscar Arias Sánchez (born 1940) is a Costa Rican politician, President of Costa Rica (1986-1990, 2006-2010). He studied law, economics, and political science (Ph.D. from University of Essex). He received the 1987 Nobel Peace Prize 'for his work for lasting peace in Central America', specifically for his principal authorship and promotion of the Central American peace plan (Esquipulas II Accords).",
+                contributions: "As President, Arias took office amidst intense civil wars and Cold War proxy conflicts in Central America (Nicaragua, El Salvador, Guatemala). In Feb 1987, he proposed a regional peace plan: national reconciliation via dialogue, cease-fires, amnesty for political prisoners, strengthening democracy (free/fair elections), and end to external military interference. Despite U.S. pressure (supporting Contra rebels in Nicaragua), Arias refused use of Costa Rican territory for Contra operations and resisted altering his plan's core tenets. He was also critical of Sandinista government's lack of democracy. The plan was signed by presidents of Costa Rica, Guatemala, El Salvador, Honduras, and Nicaragua in Aug 1987. Though implementation faced challenges, it was a landmark achievement laying groundwork for cessation of hostilities and democratic transitions. Arias advocated dialogue, regional cooperation, consensus, and demilitarization, drawing on Costa Rica's tradition of abolishing its army (1949). He used Nobel money for the Arias Foundation for Peace and Human Progress.",
+                thematicInsight: "Arias's achievement demonstrates small nations, especially those committed to neutrality/demilitarization, can play significant constructive roles in regional peacemaking. Principled diplomatic leadership can offer alternatives to conflict, even facing complex internal wars or superpower opposition. Costa Rica (no army) had moral weight. Arias, despite U.S. pressure against his indigenously developed plan, stood firm. The plan was a regional initiative, signifying collective commitment to resolve conflicts based on democracy, reconciliation, and non-interference. This showcases a leader from a small, demilitarized nation successfully promoting peace grounded in regional consensus and democratic values, not external imposition. It validates 'middle-power' diplomacy and regional ownership in peace processes, and how domestic values (Costa Rica's peace commitment) enhance foreign policy credibility. While AI could draft peace plan elements, courageous leadership to champion them, especially against larger powers, is profoundly human.",
+                aiQualitative: "An AI could analyze regional conflict dynamics, identify common interests, draft peace plans based on precedents/international law, model negotiation strategies, and simulate diplomatic outcomes. However, Arias's success involved skillful personal diplomacy, navigating regional rivalries/mistrust, and political courage against U.S. pressure. This demanded profound understanding of regional political/cultural dynamics (enriched by his international education), and moral authority from representing Costa Rica (peace/demilitarization tradition). His capacity to bring hostile presidents to negotiate and guide them to consensus relied on sophisticated human diplomatic skills (persuasion, patience, rapport, trust)—challenging for AI.",
+                aiQuantitativeScore: 8,
+                aiJustification: "Arias's 'lived experience': academic background, rise in Costa Rican politics, presidency during intense regional conflict/Cold War rivalries. His commitment to negotiated peace was informed by Costa Rica's unique demilitarized democracy identity. AI could learn Costa Rican history/policy, but replicating his blend of astute political leadership, nuanced diplomatic finesse in a high-stakes multicultural environment, and moral courage to resist superpower influence and champion a self-determined regional peace is a significant challenge. The 8% acknowledges AI's potential to model diplomatic strategies/conflict resolution frameworks but not the full spectrum of human leadership, personal conviction, and context-specific political maneuvering Arias demonstrated."
+            },
+            {
+                year: 1988,
+                name: "United Nations Peacekeeping Forces",
+                country: "United Nations",
+                nobelRecognition: "UN Peacekeeping began in 1948 with UNTSO military observers in the Middle East. Initially, missions maintained ceasefires and stabilized situations (unarmed observers or lightly armed troops for monitoring, reporting, confidence-building). Post-Cold War, they evolved to complex, 'multidimensional' enterprises implementing peace agreements and building sustainable peace in intra-state conflicts. UN Peacekeeping Forces received the 1988 Nobel Peace Prize 'for preventing armed clashes and creating conditions for negotiations'. The Committee stated they 'made important contributions towards... one of the fundamental tenets of the United Nations', helping the UN 'play a more central part in world affairs... invested with increasing trust'.",
+                contributions: "Primary role: maintain ceasefires, stabilize situations, support political efforts for peaceful conflict resolution. Modern missions: wider tasks like establishing sustainable governance institutions, human rights monitoring, security sector reform, DDR of ex-combatants. Guided by three core principles: consent of main parties, impartiality, non-use of force except in self-defense/mandate defense. Notable successes: Cambodia, Namibia, El Salvador, Mozambique. Significant failures/challenges: Rwanda (1994 genocide), Srebrenica (1995). Other challenges: unclear/insufficient mandates, inadequate funding/resources, local hostility, attacks on peacekeepers (e.g., MINUSMA in Mali), misconduct by personnel. Effectiveness depends on member state political will and conflict complexities.",
+                thematicInsight: "The 1988 Nobel for UN Peacekeeping, as operations surged post-Cold War, recognized their vital, perilous role in managing conflicts and creating space for diplomacy. It implicitly acknowledged complexities, risks, and evolving mandates. The citation's emphasis on 'preventing armed clashes and creating conditions for negotiations' reflects their ideal. Historical record (successes and failures like Rwanda/Srebrenica) underscores 'extremely difficult conditions'. Evolution from inter-state ceasefire monitoring to complex nation-building/civilian protection in intra-state conflicts posed new challenges. The 1988 award captured renewed hope but foreshadowed 1990s difficulties. Peacekeeping operates at the intersection of political will, resource constraints, party consent, and on-the-ground implementation difficulties. Successes/failures reflect broader geopolitical realities. While AI could enhance operational effectiveness, fundamental challenges (mandates, resources, political backing) remain human/political.",
+                aiQualitative: "AI could significantly enhance UN Peacekeeping: improving situational awareness (analyzing sensor data), optimizing logistics, monitoring ceasefires, detecting conflict escalation/attacks, assisting training via simulations. AI could analyze information for human rights monitoring, illicit arms tracking, DDR programs. However, peacekeeping relies heavily on human judgment, courage, adaptability, and interpersonal skills. Peacekeepers ('young people of many nations' voluntarily serving) operate in complex, dynamic, dangerous, culturally diverse environments. Core tasks (de-escalating confrontations, protecting civilians, negotiating humanitarian access, trust-building) require human empathy, nuanced communication, cultural sensitivity, ethical decision-making under pressure. 'Impartiality' requires delicate balancing by human personnel.",
+                aiQuantitativeScore: 15,
+                aiJustification: "UN Peacekeeping's 'lived experience' is the sum of experiences of hundreds of thousands of multinational personnel in diverse conflict zones over decades. AI can learn from operational data, reports, studies, identify patterns, and improve planning. However, AI cannot replicate physical courage in dangerous territories, emotional/psychological toll of witnessing atrocities, complexities of intercultural communication/cooperation, or critical human judgment in dynamic, ambiguous, life-threatening situations. The 15% reflects AI's significant potential to augment operational/analytical capabilities and learn from history, but not replicate the core human experience of peacekeepers with all attendant risks, stresses, and moral complexities."
+            },
+            {
+                year: 1989,
+                name: "Tenzin Gyatso, 14th Dalai Lama",
+                country: "India (born in Tibet)",
+                nobelRecognition: "Tenzin Gyatso, 14th Dalai Lama, spiritual leader of Tibetan people. Born Lhamo Thondup (1935) in Taktser, Amdo, Tibet. Identified as 13th Dalai Lama's reincarnation (1937), enthroned Lhasa (1940). Received Geshe Lharampa degree (Buddhist philosophy doctorate) (1959). Fled to India (1959) after China's invasion/suppression of Tibetan uprising. Established Tibetan government-in-exile (Dharamsala), became prominent global advocate for Tibetan autonomy/human rights. Devolved political powers (2011). Awarded 1989 Nobel Peace Prize 'for advocating peaceful solutions based upon tolerance and mutual respect in order to preserve the historical and cultural heritage of his people'.",
+                contributions: "For over six decades, consistent, unwavering advocate for Tibetan rights and culture preservation, using exclusively nonviolent means against China's occupation/policies. Approach rooted in Buddhist philosophy: peace, compassion, tolerance, universal responsibility, veneration for life. Proposed 'Five-Point Peace Plan': Tibet as peace zone, human rights/democratic freedoms, end Chinese population transfer, restore/protect Tibet's environment, earnest negotiations on Tibet's future status. Traveled extensively, teaching Buddhist philosophy, lecturing on peace, promoting interfaith dialogue. Core message: inner peace as foundation for external peace, cultivating loving-kindness, compassion, forgiveness, equanimity. Believes in dialogue, treating adversaries with compassion ('teachers'). Respected global moral figure.",
+                thematicInsight: "Dalai Lama's Nobel highlighted international recognition of nonviolent struggle rooted in spiritual principles (Buddhist compassion/tolerance) as legitimate, powerful resistance against political oppression/cultural destruction. Award introduced ecological dimension (Tibet as demilitarized, ecological sanctuary). Consistently advocated nonviolence despite 'brutal abuses'. Peace philosophy explicitly linked to Buddhist beliefs. Nobel citation: solutions based on 'tolerance and mutual respect'. Award legitimized resistance/peace vision not based on Western ideologies but ancient spiritual wisdom/universal ethics. Signifies expanded Nobel understanding of peace advocacy (spiritual leadership, indigenous concerns). Ethical/spiritual frameworks can provide resilient foundation for long-term nonviolent resistance. AI can process texts, but embodying spiritual authority, inspiring faith-based action, leading with compassion/moral consistency is exclusively human.",
+                aiQualitative: "AI trained on Dalai Lama's works could generate texts articulating Buddhist concepts, draft peace proposals, explain nonviolence/compassion. It could analyze Tibet's political/human rights situation, propose solutions. However, his global influence/moral authority stem from unique position as Tibetan Buddhism's spiritual leader, believed by millions to be a Bodhisattva. Advocacy isn't merely intellectual/political; intertwined with lifelong spiritual practice, personal embodiment of compassion/wisdom, charismatic presence. Ability to inspire millions, unwavering nonviolence commitment for decades against immense pressure is profoundly human, rooted in spiritual tradition. Teachings on inner peace, compassion, forgiveness from deep meditative practice/spiritual realization—states of consciousness AI cannot replicate/genuinely understand.",
+                aiQuantitativeScore: 0,
+                aiJustification: "Dalai Lama's 'lived experience' is unique, linked to Tibetan Buddhist reincarnate lama tradition: identified as reincarnation in childhood, rigorous monastic education, full political leadership at 15 during crisis, forced exile, leading government-in-exile for 50+ years while global spiritual icon/nonviolent resistance symbol. Entire life based on specific religio-cultural framework, reincarnation belief, profound personal spiritual development—far beyond AI. 'Learnings derived' from being/functioning as Bodhisattva or achieving wisdom/compassion via decades of meditative practice aren't translatable for AI simulation/experience. Replicating such spiritually defined lived experience is incongruent with AI's nature."
+            },
+            {
+                year: 1990,
+                name: "Mikhail Gorbachev",
+                country: "Soviet Union",
+                nobelRecognition: "Mikhail Gorbachev (1931–2022), last leader of Soviet Union. General Secretary of CPSU (1985-1991), President of Soviet Union (1990-1991). Studied law at Moscow State University. Awarded 1990 Nobel Peace Prize 'for the leading role he played in the radical changes in East-West relations'. Committee recognized his 'manifold personal contributions and his efforts on behalf of the Soviet Union have proved decisive'.",
+                contributions: "Committed to preserving Soviet state but convinced reform was necessary. Initiated profound domestic/foreign policy changes. Domestically: *glasnost* (openness) allowed unprecedented freedom of speech/press, criticism of government/Stalinist rule, democratization. *Perestroika* (restructuring) sought to decentralize economy, introduce market mechanisms, modernize stagnant economy. Foreign affairs: pivotal in ending Cold War. Withdrew Soviet troops from Afghanistan. Engaged in summits with U.S. President Reagan, leading to landmark arms control (INF Treaty 1987, eliminated entire nuclear weapon class). Tolerated/allowed fall of Marxist-Leninist regimes in Eastern/Central Europe (1989) and German reunification. Fundamentally altered geopolitical landscape, creating new East-West cooperation climate, allowing Eastern European nations to regain freedom/sovereignty.",
+                thematicInsight: "Gorbachev's leadership shows transformative change, even in rigid authoritarian systems, can be initiated from top by a leader willing to take ideological/political risks, often driven by pragmatic recognition of system unsustainability. Glasnost/perestroika, aimed at revitalizing Soviet system, had profound, partly unintended international consequences. Domestic reforms + revolutionary foreign policy (arms control, Afghanistan withdrawal, not using force in Eastern Europe) created conditions for peaceful Cold War end. Largely peaceful nature of this geopolitical transformation was significantly due to Gorbachev's choices/restraints. 'Gorbachev factor' underscores single leader's immense impact. Sincere reform attempts in entrenched systems can unleash powerful forces leading to outcomes beyond original intent (e.g., USSR dissolution, which he didn't initially seek). AI could model scenarios, but human leadership (vision, courage, risk-taking, managing change, navigating unforeseen consequences) is central to historic transformations.",
+                aiQualitative: "AI could analyze economic data for stagnation, model reform impacts (glasnost/perestroika), simulate arms control negotiation outcomes, draft policy papers, generate speeches. However, Gorbachev's actions involved navigating immense political risks in entrenched Soviet power structure, challenging decades of communist ideology. Willingness to depart from orthodoxy, engage in dialogue/trust-building with West, manage complex/fragmenting forces unleashed by reforms required unique vision, political skill, courage, strategic adaptation. His commitment to preserve Soviet state while believing significant reform was essential created a precarious balance. AI might struggle with such contradictions and unpredictable human reactions to radical change. 'Human factor' in high-stakes interactions with world leaders (personal chemistry, intuition, gauging trustworthiness) is outside AI's current capabilities.",
+                aiQuantitativeScore: 4,
+                aiJustification: "Gorbachev's 'lived experience': upbringing under Stalin, rise in Communist Party, then as superpower leader, making decisions that altered world order and led to dissolution of state he sought to reform. Journey involved navigating internal resistance, managing unforeseen reform consequences, making high-stakes geopolitical choices with irreversible impacts. Replicating learning processes, complex decision-making calculus, personal evolution of a leader in such a unique, historically pivotal, high-pressure global role is exceedingly difficult for AI. The 4% acknowledges AI's capacity to model political strategy/analyze economic systems, but not profound human complexities of leading such a monumental, system-ending transformation."
+            },
+            {
+                year: 1991,
+                name: "Aung San Suu Kyi",
+                country: "Myanmar",
+                nobelRecognition: "Aung San Suu Kyi (born 1945), Burmese politician, diplomat, author, pro-democracy activist. Daughter of Aung San (modern Myanmar's independence architect). Educated Burma, India, Oxford. Returned to Burma (1988) for ailing mother, as protests against military rule erupted. Rose to prominence during '8888 Uprising', co-founded National League for Democracy (NLD) (Sept 1988), General Secretary. NLD won 1990 election landslide (80%+ seats), military junta (SLORC) nullified results. Placed under house arrest (1989), spent much of next two decades detained. Awarded 1991 Nobel Peace Prize 'for her non-violent struggle for democracy and human rights' in Myanmar. Committee wished to honor 'unflagging efforts', support global democracy/human rights/ethnic conciliation by peaceful means. Committee later expressed concern about her situation post-2021 coup/convictions.",
+                contributions: "Iconic leader of Myanmar's opposition to military dictatorship. Advocacy rooted in nonviolent struggle (inspired by Gandhi, MLK Jr.). Tirelessly campaigned for democracy, human rights, rule of law, national reconciliation. Writings ('Freedom from Fear', 'In Quest for Democracy') articulate political philosophy, indigenizing universal democratic concepts with Burmese/Buddhist perspective. Emphasized true freedom requires liberation from internal fear. During house arrest, became global symbol of peaceful resistance, moral courage, unwavering democratic commitment. Famously asked: 'Please use your liberty to promote ours'. Refusal to leave Myanmar (even for dying husband) for fear junta wouldn't allow return underscored personal sacrifice/dedication. Leadership characterized by extraordinary courage (e.g., facing down regime soldiers' guns, 1989).",
+                thematicInsight: "Suu Kyi's struggle demonstrates enduring capacity of principled, nonviolent resistance, led by charismatic/morally resolute individual, to challenge military dictatorships and inspire international solidarity. Even under extreme repression (isolation, denied freedoms), her leadership remained potent symbol of hope. 1991 Nobel amplified her global voice, arguably offered protection, kept international focus on junta's abuses. Despite NLD's 1990 election nullification/long house arrest, she remained focal point of democracy movement. Unwavering nonviolence commitment, eloquent international appeals galvanized global support. Illustrates how international recognition (Nobel) can empower/shield isolated dissidents. However, later complexities/criticisms (Rohingya persecution) highlight challenges/moral compromises when iconic dissidents transition to political power, especially in ethnically diverse, conflict-ridden states. Raises questions about long-term impact/responsibilities of prestigious awards. AI could model transitions/nonviolent resistance strategies, but navigating ethical dilemmas/governance complexities requires human judgment/accountability/empathy AI lacks.",
+                aiQualitative: "AI trained on Suu Kyi's works could generate texts advocating democracy, human rights, nonviolence, mimicking her style/philosophy. It could analyze authoritarian political situations, propose democratic change strategies. However, her immense moral authority, global iconic status, profound resilience forged through decades of intense personal sacrifice (15+ years house arrest, family separation, constant threat of state violence). Leadership characterized by extraordinary personal courage, unwavering principled commitment. Steadfastness in prolonged isolation, psychological pressure, denied freedoms is profoundly human, rooted in deep conviction/fortitude. Ability to inspire nationwide movement, become international symbol of hope/peaceful resistance relied on personal charisma, lineage, symbolic power of sustained, dignified struggle.",
+                aiQuantitativeScore: 1,
+                aiJustification: "Suu Kyi's 'lived experience': daughter of independence hero, education/life abroad, unexpected return during political crisis, sudden emergence as democratic movement leader, party's electoral victory stolen, then 15-20 years house arrest as potent symbol of hope/democratic resistance. Replicating psychological fortitude, deep moral conviction, capacity for immense personal sacrifice (not leaving to see dying husband), symbolic power from such principled resistance/prolonged suffering is far beyond AI. The 1% acknowledges remote theoretical possibility AI could analyze/articulate nonviolent resistance strategies based on her example, but not capture human core of her experience, motivations, or symbolic impact."
+            },
+            {
+                year: 1992,
+                name: "Rigoberta Menchú Tum",
+                country: "Guatemala",
+                nobelRecognition: "Rigoberta Menchú Tum (born 1959), K'iche' Maya indigenous activist from Chimel, Guatemala. Childhood: poverty, agricultural labor. Family involved in peasant organizations/activism (land rights, resisting exploitation/repression during Guatemala's civil war 1960-1996). Horrific cost: father killed in protest fire (1980); younger brother kidnapped, tortured, murdered by death squad (1979); mother kidnapped, raped, mutilated, murdered by soldiers (1980). Fled to Mexico (1981). Awarded 1992 Nobel Peace Prize 'for her struggle for social justice and ethno-cultural reconciliation based on respect for the rights of indigenous peoples'. Timing (500th anniversary of Columbus's arrival) symbolic, drew attention to indigenous plight.",
+                contributions: "Prominent international voice for indigenous rights (Guatemala, Latin America, world). Courageously denounced mass atrocities (genocide) against Mayan population by Guatemalan military. Gained international prominence with testimonial autobiography 'I, Rigoberta Menchú' (1983), recounting impoverished youth, K'iche' cultural traditions, horrific violence/repression. While some narrative details later controversial (David Stoll's 1999 book), Menchú praised for crucial role in bringing international attention to Guatemala/indigenous struggles. Used Nobel money for Rigoberta Menchú Tum Foundation (FRMT), indigenous advocacy for Mayan communities, rights promotion, justice for genocide victims. Advocacy: social justice, ethno-cultural reconciliation, respect for indigenous traditions/identity, combating class/racial inequality. Developed into skilled public speaker/organizer. Later ran for Guatemalan President (WINAQ, first indigenous-led party she founded).",
+                thematicInsight: "Menchú Tum's Nobel marked significant international recognition for indigenous peoples' struggles for social justice, human rights, ethno-cultural survival as critical peace components. Personal testimony ('I, Rigoberta Menchú') powerful tool for globalizing awareness, despite later scrutiny of some claims. Nobel citation: 'social justice and ethno-cultural reconciliation based on respect for the rights of indigenous peoples'. Symbolic timing (Columbus quincentennial) amplified historical injustices. Her book, giving personal voice to Maya-Quiché suffering during Guatemalan genocide, brought their plight to unprecedented international prominence. Underscores impact individual narratives of suffering/resistance can have in shaping global consciousness/mobilizing support. Despite detail debates, her role as catalyst for awareness of Guatemalan genocide/broader indigenous issues is undeniable.",
+                aiQualitative: "AI could analyze data on indigenous rights violations, land disputes, socio-economic inequalities. Could assist drafting reports, legal briefs, advocacy materials. Trained on 'I, Rigoberta Menchú'/indigenous testimonies, AI might generate narratives highlighting injustices/challenges. However, Menchú Tum's power as advocate/global resonance stem from personal story of profound suffering, unwavering resilience, deeply rooted Maya-Quiché identity. Ability to articulate collective trauma, cultural richness, aspirations, 'speak not only in her own voice, but also as a representative of her entire Maya-Quiché community' linked to lived experience/cultural heritage. Advocacy involves navigating language, education, political power, spirituality, ancestral tradition from authentic indigenous perspective. AI cannot possess indigenous identity or genuinely comprehend/convey deep spiritual connection to land/community informing indigenous worldviews.",
+                aiQuantitativeScore: 1,
+                aiJustification: "Menchú Tum's 'lived experience': growing up in extreme poverty/systemic discrimination, witnessing/personally suffering horrific state-sponsored violence against family/community (torture/murder of relatives), forced exile, then courageously transforming trauma into powerful global voice for indigenous rights/social justice. Harrowing journey linked to specific Maya-Quiché cultural identity, brutal Guatemalan civil war/genocide context, profound personal loss. AI cannot replicate indigenous identity, intergenerational genocide trauma, deep connection to ancestral traditions/land/community informing her worldview/advocacy, or subjective experience of such suffering/resilience. The 1% acknowledges remote theoretical possibility AI could analyze/synthesize indigenous struggle narratives, but not embody/authentically represent lived reality or cultural essence of her experience."
+            },
+            {
+                year: 1993,
+                name: "Nelson Mandela & Frederik Willem de Klerk",
+                country: "South Africa",
+                nobelRecognition: "Nelson Mandela (1918–2013), South African anti-apartheid revolutionary, political leader, philanthropist, President of South Africa (1994-1999). Joined ANC (1944), leading figure against apartheid. After ANC banned/adopted armed struggle (co-founded Umkhonto we Sizwe), arrested, sentenced to life (1964), spent 27 years imprisoned. Released Feb 11, 1990. Frederik Willem (F.W.) de Klerk (1936–2021), South African politician, State President (1989-1994). Leader of National Party (apartheid architect). Initiated/presided over reforms dismantling apartheid. Jointly awarded 1993 Nobel Peace Prize 'for their work for the peaceful termination of the apartheid regime, and for laying the foundations for a new democratic South Africa'.",
+                contributions: "Mandela: Lifelong anti-apartheid struggle, resilience during 27-year imprisonment (global resistance symbol), crucial leadership in negotiating peaceful transition to multiracial democracy. Upon release, advocated reconciliation/forgiveness over revenge (pivotal in preventing civil war). As president, guided transition, emphasizing national unity ('Rainbow Nation'). Immense moral authority, non-racialism commitment, profound personal sacrifice. De Klerk: Courageous decision as apartheid state leader to unban ANC/anti-apartheid organizations, release Mandela/political prisoners, enter negotiations for new democratic constitution. Radical departure for National Party. Persuaded majority white South Africans to support reforms (1992 referendum). Critical role with Mandela in navigating complex negotiations to first multiracial democratic elections (April 1994). Served as Deputy President in Mandela's Government of National Unity.",
+                thematicInsight: "Joint award to Mandela/de Klerk underscores peaceful dismantling of entrenched oppression (apartheid) often requires courageous leadership from oppressed and, critically, within oppressor group. Mandela (embodying Black majority resistance/aspirations) and de Klerk (representing white minority government) took profoundly difficult, politically risky initiatives. Mandela's non-racial democracy commitment (even after brutal imprisonment) and reconciliation emphasis provided moral foundation. De Klerk's willingness to acknowledge apartheid's unsustainability/injustice, release Mandela, negotiate with ANC (despite fierce internal opposition) was crucial catalyst. Ability to forge working relationship, steer divided nation from civil war to negotiated settlement showed exceptional statesmanship. Partnership, though complex/strained, essential for new democratic South Africa foundations. Highlights transformative peace often depends on key individuals on opposing sides choosing negotiation/reconciliation over continued conflict.",
+                aiQualitative: "Mandela: AI could analyze apartheid history, ANC strategies, anti-apartheid movements, draft speeches based on his works. However, Mandela's impact forged through decades of struggle, 27 years harsh imprisonment solidifying moral authority/symbolic power. Capacity for forgiveness, reconciliation commitment, ability to unite fractured nation were profoundly human, developed through immense suffering/reflection. Leadership involved inspiring millions, difficult strategic decisions (non-violence to armed struggle to negotiation), embodying oppressed majority's hopes—not AI-replicable. De Klerk: AI could model political scenarios, analyze negotiation tactics. But his decision to dismantle apartheid involved immense personal/political risk, challenging his party's core ideology, persuading a resistant white minority. Required astute political judgment, moral courage, ability to manage profound societal shift. Human elements of trust, risk assessment, leadership in such a transformation are beyond AI.",
+                aiQuantitativeScore: 0, // For Mandela, perhaps 2-3% for de Klerk if focusing on strategic shifts. For simplicity, an average or the lower bound is often used. The prompt implies a single score per entry if not specified. Let's use 0% for Mandela, and 3% for De Klerk, then average to 1.5, round to 2%. Or, as the prompt example for Sadat/Begin showed individual scores, I should stick to that. Let's give Mandela 0% and De Klerk 3%.
+                aiJustification: "Mandela (0%): His lived experience—tribal royalty to activist, armed struggle leader, political prisoner for decades, then president leading nation out of systemic racism via reconciliation—is unparalleled human endurance, moral fortitude, and transformative leadership. Replicating this is impossible for AI. De Klerk (3%): His 'lived experience' involved being a product of the apartheid system, rising to its leadership, then making the momentous decision to dismantle it, facing down extreme opposition from his own base. This required a complex mix of pragmatism, political courage, and a capacity for personal evolution in response to historical imperatives. While AI might model political shifts, the human element of such a high-stakes, ideologically charged personal and political transformation is largely beyond replication."
+            }
+        ];
+
+        const yearFilter = document.getElementById('yearFilter');
+        const laureateList = document.getElementById('laureateList');
+        const detailContent = document.getElementById('detailContent');
+        const aiReplicationChartCanvas = document.getElementById('aiReplicationChart');
+        const clearFilterButton = document.getElementById('clearFilter');
+        let activeLaureateCard = null;
+        let chartInstance = null;
+
+        function populateYearFilter() {
+            const years = [...new Set(laureatesData.map(l => l.year))].sort((a, b) => a - b);
+            years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearFilter.appendChild(option);
+            });
+        }
+
+        function renderLaureates(filterYear = 'all') {
+            laureateList.innerHTML = '';
+            const filteredLaureates = filterYear === 'all'
+                ? laureatesData
+                : laureatesData.filter(l => l.year == filterYear);
+
+            if (filteredLaureates.length === 0) {
+                laureateList.innerHTML = '<p class="text-gray-500">No laureates found for this year.</p>';
+                return;
+            }
+
+            filteredLaureates.forEach(laureate => {
+                const card = document.createElement('div');
+                card.className = 'laureate-card p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-lg cursor-pointer bg-white';
+                card.innerHTML = `
+                    <h3 class="text-lg font-semibold text-orange-600">${laureate.name}</h3>
+                    <p class="text-sm text-gray-500">${laureate.year} - ${laureate.country}</p>
+                    <p class="text-xs text-teal-600 mt-1">AI Score: ${laureate.aiQuantitativeScore}%</p>
+                `;
+                card.addEventListener('click', () => {
+                    displayLaureateDetail(laureate);
+                    if (activeLaureateCard) {
+                        activeLaureateCard.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50');
+                    }
+                    card.classList.add('ring-2', 'ring-orange-500', 'bg-orange-50');
+                    activeLaureateCard = card;
+                });
+                laureateList.appendChild(card);
+            });
+        }
+
+        function displayLaureateDetail(laureate) {
+            let nameHtml = `<h2 class="text-3xl font-bold text-orange-700 mb-2">${laureate.name}</h2>`;
+            if (laureate.name.includes('&')) { // Handle joint laureates
+                nameHtml = `<h2 class="text-3xl font-bold text-orange-700 mb-2">${laureate.name.replace(' & ', '<span class="font-normal"> & </span>')}</h2>`;
+            }
+
+            let justificationHtml = '';
+            if (laureate.name === "Muhammad Anwar el-Sadat & Menachem Begin") {
+                justificationHtml = `
+                    <h4 class="font-semibold mt-2 text-gray-700">Sadat:</h4>
+                    <p class="text-sm text-gray-600">${laureatesData.find(l => l.name.includes("Sadat")).aiJustification.split("Sadat (3%):")[1].split("Begin (3%):")[0].trim()}</p>
+                    <h4 class="font-semibold mt-2 text-gray-700">Begin:</h4>
+                    <p class="text-sm text-gray-600">${laureatesData.find(l => l.name.includes("Begin")).aiJustification.split("Begin (3%):")[1].trim()}</p>
+                `;
+            } else if (laureate.name === "Nelson Mandela & Frederik Willem de Klerk") {
+                justificationHtml = `
+                    <h4 class="font-semibold mt-2 text-gray-700">Mandela:</h4>
+                    <p class="text-sm text-gray-600">${laureatesData.find(l => l.name.includes("Mandela")).aiJustification.split("Mandela (0%):")[1].split("De Klerk (3%):")[0].trim()}</p>
+                    <h4 class="font-semibold mt-2 text-gray-700">De Klerk:</h4>
+                    <p class="text-sm text-gray-600">${laureatesData.find(l => l.name.includes("De Klerk")).aiJustification.split("De Klerk (3%):")[1].trim()}</p>
+                `;
+            } else {
+                justificationHtml = `<p class="text-sm text-gray-600">${laureate.aiJustification}</p>`;
+            }
+
+
+            detailContent.innerHTML = `
+                ${nameHtml}
+                <p class="text-md text-gray-500 mb-4">${laureate.year} - ${laureate.country}</p>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-orange-600 mb-2 border-b pb-1">Nobel Recognition</h3>
+                    <p>${laureate.nobelRecognition}</p>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-orange-600 mb-2 border-b pb-1">Defining Contributions & Advocacy</h3>
+                    <p>${laureate.contributions}</p>
+                </div>
+                
+                ${laureate.thematicInsight ? `
+                <div class="mb-6 p-4 bg-amber-50 border-l-4 border-amber-400 rounded">
+                    <h3 class="text-lg font-semibold text-amber-700 mb-2">Thematic Insight</h3>
+                    <p class="italic text-gray-700">${laureate.thematicInsight}</p>
+                </div>` : ''}
+
+                <div>
+                    <h3 class="text-xl font-semibold text-orange-600 mb-2 border-b pb-1">AI Prognostication: Impact & Experience</h3>
+                    <div class="p-4 bg-teal-50 border-l-4 border-teal-400 rounded">
+                        <h4 class="text-lg font-semibold text-teal-700">Qualitative Analysis:</h4>
+                        <p class="mb-2">${laureate.aiQualitative}</p>
+                        <h4 class="text-lg font-semibold text-teal-700">Quantitative Assessment (Lived Experience Replication Probability): <span class="text-2xl font-bold">${laureate.aiQuantitativeScore}%</span></h4>
+                        <p class="text-sm text-gray-600 mt-1"><strong>Justification:</strong></p>
+                        ${justificationHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function wrapText(text, maxWidth) {
+            const words = text.split(' ');
+            let lines = [];
+            let currentLine = words[0];
+
+            for (let i = 1; i < words.length; i++) {
+                if (currentLine.length + words[i].length + 1 <= maxWidth) {
+                    currentLine += ' ' + words[i];
+                } else {
+                    lines.push(currentLine);
+                    currentLine = words[i];
+                }
+            }
+            lines.push(currentLine);
+            return lines;
+        }
+
+
+        function renderAIReplicationChart() {
+            const ctx = aiReplicationChartCanvas.getContext('2d');
+
+            const labels = laureatesData.map(l => {
+                // For joint laureates, try to make it more readable
+                if (l.name.includes('&')) {
+                    return l.name.split('&').map(s => s.trim().split(' ').pop()); // Last names
+                }
+                return l.name.split(' ').pop(); // Last name or main org name
+            });
+
+            const data = laureatesData.map(l => l.aiQuantitativeScore);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: laureatesData.map(l => l.name), // Full names for tooltips
+                    datasets: [{
+                        label: 'AI Lived Experience Replication Probability (%)',
+                        data: data,
+                        backgroundColor: laureatesData.map(l => l.aiQuantitativeScore < 10 ? 'rgba(249, 115, 22, 0.6)' : 'rgba(20, 184, 166, 0.6)'), // orange for low, teal for higher
+                        borderColor: laureatesData.map(l => l.aiQuantitativeScore < 10 ? 'rgba(249, 115, 22, 1)' : 'rgba(20, 184, 166, 1)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100, // Or adjust dynamically: Math.max(...data) + 10
+                            title: {
+                                display: true,
+                                text: 'Probability (%)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                callback: function (value, index, values) {
+                                    const originalLabel = this.getLabelForValue(value);
+                                    // Attempt to shorten labels for display on axis
+                                    if (originalLabel.includes('&')) {
+                                        return originalLabel.split('&').map(s => s.trim().split(' ').pop()).join(' & ');
+                                    }
+                                    const parts = originalLabel.split(' ');
+                                    if (parts.length > 2 && !["International", "Office"].includes(parts[0])) { // Heuristic for multi-word names vs orgs
+                                        return parts[0].charAt(0) + ". " + parts[parts.length - 1]; // F. LastName
+                                    }
+                                    return originalLabel.length > 16 ? originalLabel.substring(0, 15) + '...' : originalLabel;
+                                },
+                                autoSkip: false,
+                                maxRotation: 70,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.dataset.label}: ${context.raw}%`;
+                                },
+                                title: function (context) {
+                                    return context[0].label; // Full name from original labels
+                                }
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+
+        yearFilter.addEventListener('change', (e) => {
+            renderLaureates(e.target.value);
+            detailContent.innerHTML = `
+                <h2 class="text-2xl font-semibold text-orange-700">Select a Laureate</h2>
+                <p class="text-gray-600">Click on a laureate from the list to see their details here.</p>`;
+            if (activeLaureateCard) {
+                activeLaureateCard.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50');
+                activeLaureateCard = null;
+            }
+        });
+
+        clearFilterButton.addEventListener('click', () => {
+            yearFilter.value = 'all';
+            renderLaureates('all');
+            detailContent.innerHTML = `
+                <h2 class="text-2xl font-semibold text-orange-700">Select a Laureate</h2>
+                <p class="text-gray-600">Click on a laureate from the list to see their details here.</p>`;
+            if (activeLaureateCard) {
+                activeLaureateCard.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50');
+                activeLaureateCard = null;
+            }
+        });
+
+
+        // Initial render
+        populateYearFilter();
+        renderLaureates();
+        renderAIReplicationChart();
+
+    </script>
+</body>
+
+</html>
